@@ -6,31 +6,70 @@
 //
 import Cocoa
 
-@main
+extension AppDelegate {
+    func stopHUDCapture() {
+        print("⏸ AppDelegate: HUDキャプチャ停止")
+        keyCapture.stop()
+    }
+
+    func startHUDCapture() {
+        print("🎬 AppDelegate: HUDキャプチャ開始")
+        keyCapture.start()
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusBar: StatusBarController?
     private let hudController = HUDController.shared
     private let keyCapture = KeyCapture.shared
 
+    
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("🚀 AppDelegate.swift が読み込まれました")
-
-
-        // ✅ Dockを非表示（LSUIElement=trueでさらに安全）
-        NSApp.setActivationPolicy(.accessory)
-        print("✅ Dock 非表示モードで起動")
-
-        // ✅ 少し遅らせてメニューバーを初期化（0.5秒後）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.initializeStatusBar()
+        // ✅ Dock表示モード
+        NSApp.setActivationPolicy(.regular)
+        
+        //メインメニューをセットアップ
+        setupMainMenu()
+        
+        // ✅ キーキャプチャ開始
+        startCapture()
+        // ✅ UIスレッド上でStatusBarを初期化（確実に描画）
+        DispatchQueue.main.async {
+            self.initializeStatusBar()
         }
 
-        // ✅ キーキャプチャを開始
-        startCapture()
 
         print("🚀 ShortcutHUD 起動完了")
     }
+    private func setupMainMenu() {
+        // ✅ アプリケーションメニュー作成
+        let mainMenu = NSMenu()
+
+        // ───────────────
+        // [ShortcutHUD] メニュー
+        // ───────────────
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+
+        let appMenu = NSMenu(title: "ShortcutHUD")
+
+        // 終了メニュー項目を追加
+        let quitTitle = "終了 ShortcutHUD"
+        appMenu.addItem(
+            withTitle: quitTitle,
+            action: #selector(NSApp.terminate),
+            keyEquivalent: "q"
+        )
+
+        appMenuItem.submenu = appMenu
+
+        // ✅ 作成したメニューをアプリに登録
+        NSApp.mainMenu = mainMenu
+        print("📋 メニューバーに『終了』を追加しました")
+    }
+
 
     func applicationWillTerminate(_ notification: Notification) {
         stopCapture()
@@ -38,13 +77,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func initializeStatusBar() {
-        statusBar = StatusBarController()
-        statusBar?.onToggle = { [weak self] enabled in
-            enabled ? self?.startCapture() : self?.stopCapture()
+        DispatchQueue.main.async {
+            print("🧩 StatusBarController.init() 実行中")
+            self.statusBar = StatusBarController(initiallyEnable: true)
+            
+            self.statusBar?.onToggle = { [weak self] enabled in
+                enabled ? self?.startCapture() : self?.stopCapture()
+            }
+            self.statusBar?.onQuit = { NSApp.terminate(nil) }
         }
-        statusBar?.onQuit = { NSApp.terminate(nil) }
-        statusBar?.setActive(true)
-        print("📎 メニューバーアイコン作成完了")
     }
 
     private func startCapture() {
@@ -53,12 +94,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         keyCapture.start()
         print("🎬 キーキャプチャ開始")
-        statusBar?.setActive(true)
     }
 
     private func stopCapture() {
         keyCapture.stop()
         print("⏹ キーキャプチャ停止")
-        statusBar?.setActive(false)
     }
 }
+
